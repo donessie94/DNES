@@ -14,6 +14,11 @@ TranslationResult NROM::translate_cpu_read_addr(Word addr)
         return {true, CartridgeRegion::PRG_RAM, translated_addr};
     }
 
+    // NOTE: Special locations at the end of PGR ROM include
+    // 0xFFFA-0xFFFB -> NMI vector (CPU jumps here on NMI interrupts to execute graphic updates)
+    // 0xFFFC-0xFFFD -> RESET vector
+    // 0xFFFE-0xFFFF -> IRQ/BRK vector
+
     // $BFFF - $8000 = $3FFF size = 16384 bytes (16384 memory slots of a byte each)
     if (addr <= 0xBFFF){ // First 16 KiB of PRG-ROM
         Word translated_addr  = 0x3FFF - (0xBFFF - addr);

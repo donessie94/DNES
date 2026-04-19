@@ -28,7 +28,7 @@ This project focuses on building the emulator core from the ground up, with an e
 ## Build Instructions
 
 ```bash
-git clone <repo-url>
+git clone <https://github.com/donessie94/DNES>
 cd DNES
 git submodule update --init --recursive
 cmake -S . -B build

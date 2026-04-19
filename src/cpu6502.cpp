@@ -1,5 +1,6 @@
 #include "../include/cpu6502.h"
 #include "../include/bus.h"
+#include "cpu6502.h"
 
 void CPU6502::reset()
 {
@@ -41,17 +42,18 @@ Byte CPU6502::fetch_opCode()
     return op;
 }
 
-void CPU6502::exec_nxt_instr()
+int CPU6502::exec_nxt_instr()
 {
     Byte op = fetch_opCode();
     Instr instr_metadata = instr_table[op];
-    if(!instr_metadata.implemented) return;
+    if(!instr_metadata.implemented) return -1;
 
     auto idx = static_cast<std::size_t>(instr_metadata.mnemonic); // convert enum class to int
     InstrHandler handler = handler_table[idx];
     Byte extra_cycles = (this->*handler)(instr_metadata.mode); // calling the correct member fucntion
     total_cpu_cycles += instr_metadata.cycles;
     total_cpu_cycles += extra_cycles;
+    return instr_metadata.cycles + extra_cycles; // how many cycles this instr took
 }
 
 OperandResult CPU6502::fetch_operand(AddrMode mode)
@@ -89,6 +91,36 @@ OperandResult CPU6502::resolve_address(AddrMode mode)
     case AddrMode::IndirectIndexed:     return get_indirectIndexed_address();
     default:                            return {};
     }
+}
+
+void CPU6502::handle_nmi_interrupt()
+{
+    // push return address high byte
+    // push return address low byte
+    // push processor status register (P)
+    // read vector from $FFFA-$FFFB (cartridge)
+    // set PC to that address
+    // clear pending NMI
+    // set the interrupt-disable flag as appropriate for interrupt entry
+
+    Byte hi = Byte(regs.pc >> 8);
+    bus_write(0x0100 | regs.sp, hi);
+    regs.sp--;
+    Byte lo = Byte(regs.pc & 0b0000000011111111);
+    bus_write(0x0100 | regs.sp, lo);
+    regs.sp--;
+
+    StatusFlags pushed_flags = regs.p;
+    pushed_flags.brk = false;
+    pushed_flags.unused = true;
+    bus_write(0x0100 | regs.sp, pushed_flags.to_byte());
+    regs.sp--;
+
+    Word addr_hi = bus_read(0xFFFB);
+    Word addr_lo = bus_read(0xFFFA); // cuz little endian
+    Word addr    = (addr_hi << 8) | addr_lo;
+    regs.pc = addr;
+    regs.p.interrupt_disable = true;
 }
 
 OperandResult CPU6502::get_accumulator_operand()

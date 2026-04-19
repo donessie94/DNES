@@ -18,9 +18,10 @@ public:
     Byte bus_read(Word addr) const;
     void bus_write(Word addr, Byte val) const;
     Byte fetch_opCode();
-    void exec_nxt_instr();
+    int exec_nxt_instr();
     OperandResult fetch_operand(AddrMode mode);
     OperandResult resolve_address(AddrMode mode);
+    void handle_nmi_interrupt();
 
     OperandResult get_accumulator_operand();
     OperandResult get_immediate_operand();
@@ -43,8 +44,6 @@ public:
     OperandResult get_indirect_address();
     OperandResult get_indexedIndirect_address();
     OperandResult get_indirectIndexed_address();
-
-    int me_la_suda();
 
     Byte exec_adc(AddrMode mode);
     Byte exec_and(AddrMode mode);
