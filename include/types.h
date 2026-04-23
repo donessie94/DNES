@@ -69,6 +69,13 @@ enum class NametableSource {
     CARTRIDGE_FOUR_SCREEN_RAM
 };
 
+enum class BackgroundFetchPhase {
+    NametableFetch  = 1,
+    AttributeFetch  = 3,
+    TileLowFetch    = 5,
+    TileHighFetch   = 7,
+};
+
 struct NametableMappingResult {
     NametableSource source{NametableSource::PPU_RAM};
     Word offset{};
@@ -108,9 +115,9 @@ struct INesHeader
         flags6 = raw_rom_data[6];
 
         if(flags6 & 0b00001000) { mirroring_mode = MirroringMode::FOUR_SCREENS; }
-        else { mirroring_mode = flags6 & 0b00000001
-                                ? MirroringMode::HORIZONTAL
-                                : MirroringMode::VERTICAL;}
+        else { mirroring_mode = (flags6 & 0b00000001)
+                        ? MirroringMode::VERTICAL
+                        : MirroringMode::HORIZONTAL; }
 
         flags7 = raw_rom_data[7];
         prg_ram_banks = raw_rom_data[8];
@@ -155,9 +162,9 @@ struct PPURegisters {
 
 struct PPUCTRLDecoded {
     Word base_nameTable_addr{};          // bits 0-1: selected base nametable ($2000/$2400/$2800/$2C00)
-    bool scroll_x_bit_8{};               // comes from PPUCTRL bit 0
-    bool scroll_y_bit_8{};               // comes from PPUCTRL bit 1
-    Byte vram_increment_mode{};          // bit 2: how much PPUADDR increments after PPUDATA access (1 or 32)
+    bool nametable_select_x{};           // comes from PPUCTRL bit 0
+    bool nametable_select_y{};           // comes from PPUCTRL bit 1
+    Byte vram_increment_mode{};          // bit 2: how much current_vram_addr increments after PPUDATA access (1 or 32)
     Word sprite_pattern_table_base{};    // bit 3: sprite pattern table base for 8x8 sprites ($0000 or $1000)
     Word background_pattern_table_base{};// bit 4: background pattern table base ($0000 or $1000)
     SpriteSize sprite_sz{};              // bit 5: sprite size mode (8x8 or 8x16)
@@ -167,8 +174,8 @@ struct PPUCTRLDecoded {
 
 struct PPUMASKDecoded {
     bool greyscale{};                   // bit 0: render in greyscale
-    bool show_background_left_8px{};    // bit 1: show background in leftmost 8 pixels
-    bool show_sprites_left_8px{};       // bit 2: show sprites in leftmost 8 pixels
+    bool show_background_leftmost_8_pixels{};    // bit 1: show background in leftmost 8 pixels
+    bool show_sprites_leftmost_8_pixels{};       // bit 2: show sprites in leftmost 8 pixels
     bool background_rendering_enabled{};// bit 3: enable background rendering
     bool sprite_rendering_enabled{};    // bit 4: enable sprite rendering
     bool emphasize_red{};               // bit 5: color emphasis red
@@ -181,6 +188,118 @@ struct DebugImage {
     int height{};
     FrameBuffer pixels{};
 };
+
+struct BackgroundRenderPipeline {
+    // The pattern table tile index for the next tile.
+    Byte next_pattern_tile_idx{};
+
+    // The raw attribute byte for the next tile region.
+    Byte next_attr_byte{};
+
+    // The low bitplane byte for the current row of the next tile.
+    Byte next_tile_pattern_lo{};
+
+    // The high bitplane byte for the current row of the next tile.
+    Byte next_tile_pattern_hi{};
+
+    // Active low pattern bits being shifted pixel by pixel.
+    std::uint16_t pattern_shift_lo{};
+
+    // Active high pattern bits being shifted pixel by pixel.
+    std::uint16_t pattern_shift_hi{};
+
+    // Active low palette bits being shifted pixel by pixel.
+    std::uint16_t attr_shift_lo{};
+
+    // Active high palette bits being shifted pixel by pixel.
+    std::uint16_t attr_shift_hi{};
+};
+
+struct BackgroundScrollState {
+    // ==============================================================================
+    // MUST READ                                                                    ||
+    // ==============================================================================
+    // Current VRAM address used by the background fetch pipeline ("v").
+    //
+    // This is the single source of truth for the background/nametable-space
+    // position the PPU is actively rendering/fetching from.
+    //
+    // Important:
+    // the NES PPU layout is designed so this one value can directly represent
+    // things like nametable selection, tile row/column, and fine Y scroll.
+    //
+    // yyy NN YYYYY XXXXX   Note: top/15 bit is not used
+    // ||| || ||||| +++++-- tile column within nametable
+    // ||| || +++++-------- tile row within nametable
+    // ||| ++-------------- nametable select bits (bit 10 col/lo, bit 11 row/hi)
+    // +++----------------- fine Y scroll
+    //
+    // Note:
+    // we could recover similar information arithmetically by first treating
+    // this like a normal nametable space address:
+    //
+    //   1. offset = current_vram_addr - 0x2000
+    //   2. nametable_number = offset / 1024
+    //   3. offset_within_nametable = offset % 1024
+    //   4. if offset_within_nametable < 960, then:
+    //        tile_row = offset_within_nametable / 32
+    //        tile_col = offset_within_nametable % 32
+    //   5. nametable_number then tells us the horizontal/vertical nametable bits
+    //      (top-left, top-right, bottom-left, bottom-right)
+    //
+    // That arithmetic reasoning gets us to similar background position info.
+    // However, the NES PPU is specifically designed so these pieces are already
+    // packed into this value, which makes bit extraction the more direct and
+    // more faithful approach.
+    Word current_vram_addr{};
+
+    // Temporary VRAM address used by the background scroll/fetch logic ("t").
+    //
+    // Like current_vram_addr, this is a packed background/nametable-space
+    // address value whose bit fields encode nametable selection, tile row/column,
+    // and fine Y scroll.
+    //
+    // This is the single source of truth for what CPU writes to
+    // PPUCTRL / PPUSCROLL / PPUADDR have built up so far.
+    //
+    // The PPU later copies parts of it into current_vram_addr at specific
+    // points in the rendering pipeline.
+    Word temp_vram_addr{};
+
+    // Fine horizontal scroll inside the current pattern tile [0, 7] ("x").
+    // basically which horizontal pixel column we are on inside the pattern tile
+    //
+    // This is the single source of truth for the active fine X scroll.
+    Byte fine_x_scroll{};
+
+    // First/second write toggle used by PPUSCROLL / PPUADDR ("w").
+    //
+    // This is now the single shared write latch for the CPU facing scroll/address path.
+    Toggler write_toggle{};
+};
+
+struct BackgroundPixelSample
+{
+    std::uint32_t rgba{};
+    // palette_entry == 0 means background considered transparent for hit logic
+    // otherwise background considered opaque for hit logic
+    bool is_opaque{};
+};
+
+struct SpritePixelSample
+{
+    int sprite_index{-1};
+    Byte sprite_x{};
+    Byte sprite_y{};
+    int local_x{};
+    int local_y{};
+    Byte attr_byte{};
+    Byte palette_entry{};
+    bool is_opaque{};
+    bool behind_background{};
+    std::uint32_t sprite_rgba{};
+};
+
 
 inline constexpr std::array<RGB, 64> NES_RGB_PALETTE{{
     RGB{0x7C,0x7C,0x7C}, RGB{0x00,0x00,0xFC}, RGB{0x00,0x00,0xBC}, RGB{0x44,0x28,0xBC},
@@ -207,6 +326,20 @@ inline constexpr std::array<std::uint32_t, 4> DEBUG_GRAYSCALE_RGBA{{
         0xAAAAAAFF, // 2 = light gray
         0xFFFFFFFF  // 3 = white
     }};
+
+inline constexpr std::array<BackgroundFetchPhase, 8> BACKGROUND_FETCH_PHASE_MAP{{
+    BackgroundFetchPhase::NametableFetch,
+    BackgroundFetchPhase::NametableFetch,
+
+    BackgroundFetchPhase::AttributeFetch,
+    BackgroundFetchPhase::AttributeFetch,
+
+    BackgroundFetchPhase::TileLowFetch,
+    BackgroundFetchPhase::TileLowFetch,
+
+    BackgroundFetchPhase::TileHighFetch,
+    BackgroundFetchPhase::TileHighFetch,
+}};
 
 static std::array<Instr, 256> build_official_instr_table()
 {

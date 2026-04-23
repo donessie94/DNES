@@ -44,22 +44,66 @@ public:
     void cpu_write_ppuaddr(Byte val);
     void cpu_write_ppudata(Byte val);
 
+    void rebuild_temp_vram_addr_from_scroll_state();
+    void copy_horizontal_scroll_bits_from_temp_to_current_vram_addr();
+    void copy_vertical_scroll_bits_from_temp_to_current_vram_addr();
+    void increment_horizontal_background_vram_addr();
+    void increment_vertical_background_vram_addr();
+
+    int get_tile_col_within_nametable(Word vram_addr);
+    int get_tile_row_within_nametable(Word vram_addr);
+    int get_nametable_col_select(Word vram_addr);
+    int get_nametable_row_select(Word vram_addr);
+    int get_nametable_number(Word vram_addr);
+    int get_fine_y_scroll(Word vram_addr); // fine_x is stored separatedly
+
+    void fetch_next_background_nametable_byte();
+    void fetch_next_background_attribute_byte();
+    void fetch_next_background_pattern_tile_low_byte();
+    void fetch_next_background_pattern_tile_high_byte();
+
+    void load_background_shift_registers();
+    void shift_background_registers();
+    BackgroundPixelSample sample_current_background_pixel_rgba();
+
+    void collect_visible_sprite_indices_for_scanline(int scanline);
+    std::vector<int> overlapping_sprites_idx{}; // collects once per scanline the overlapping idx of sprites
+
+    SpritePixelSample sample_sprite_pixel(int sprite_index, int pixel_x, int pixel_y);
+    Word resolve_sprite_pattern_row_address(int tile_pttrn_idx, int local_y);
+
+    void apply_left_edge_render_mask(int pixel_x,
+                                    BackgroundPixelSample& bg_sample,
+                                    SpritePixelSample& sprite0_data,
+                                    SpritePixelSample& chosen_sprite);
+
+    bool can_set_sprite_zero_hit_for_current_dot(int pixel_x, const BackgroundPixelSample& bg_sample,
+                                    const SpritePixelSample& sprite0_data,
+                                    const SpritePixelSample& chosen_sprite) const;
+
+    void update_sprite_zero_hit_flag(int pixel_x,
+                                    const BackgroundPixelSample& bg_sample,
+                                    const SpritePixelSample& sprite0_data,
+                                    const SpritePixelSample& chosen_sprite);
+
+    uint32_t composite_background_and_sprite(const BackgroundPixelSample& bg_sample,
+                                                const SpritePixelSample& sprite_data);
+
     DebugImage build_pattern_table_debug_image();
     DebugImage build_palette_debug_image();
     DebugImage build_nametable_debug_image();
+
+    void render_current_static_nametable_background();
 
     PPURegisters regs{};        // true simple PPU registers: control, mask, status, and OAM address
     int current_scanline{};
     int current_dot{};
     bool NMI_request{};
 
-    Word ppu_addr{};            // current 16-bit PPU memory address built through two writes to $2006
-    Toggler ppu_addr_toggle{};  // next $2006 write is the first byte or second byte?
+    // Shared first/second write toggle used by PPUSCROLL / PPUADDR.
+    // This is the CPU facing write latch ("w") in the real PPU model.
+    Toggler ppu_write_toggle{};
     Byte read_buffer{};
-
-    Word ppu_scroll_x{};        // horizontal scroll info written through the first write to $2005
-    Word ppu_scroll_y{};        // vertical scroll info written through the second write to $2005
-    Toggler ppu_scroll_toggle{};// next $2005 write is X-scroll or Y-scroll?
 
     Byte oam_dma{}; // last value written to $4014, used as the CPU memory page for sprite DMA
 
@@ -74,10 +118,57 @@ public:
 
     // uint32_t = 4 Bytes and represents a single pixel
     // Red, Green, Blue, Alpha (4 Bytes)
-    FrameBuffer screen_pixels{256 * 240, 0};
-    FrameBuffer palette_debug_pixels{128 * 64, 0};
-    FrameBuffer pattern_table_debug_pixels{256 * 128, 0};
-    FrameBuffer nametable_debug_pixels{256 * 240, 0};
+    FrameBuffer screen_pixels = FrameBuffer(256 * 240, 0); // initializing it
+
+    // --------------------------------------
+    // Background rendering pipeline state. |
+    // --------------------------------------
+    // The PPU fetches background data for the next tile, stores it in small
+    // "next" byte latches/variables, and periodically loads that data into shift
+    // registers. Then, during visible dots, one background pixel's bits are
+    // shifted out each cycle.
+    BackgroundRenderPipeline background_render_state{};
+
+    // --------------------------------------
+    // Background Scroll / Fetch State      |
+    // --------------------------------------
+    // The NES background is organized as a 32x30 tile grid (960 tile indices).
+    //
+    // Important:
+    // attribute table palette selection depends on the tile's position inside
+    // the nametable itself, not on where that tile currently appears on the
+    // visible screen.
+    // In other words, scrolling may change where a tile is shown on screen,
+    // but the attribute table still interprets that tile using its original
+    // nametable local tile row and tile column.
+    //
+    // These fields track where the background pipeline is currently fetching from
+    // inside the scrolling nametable world.
+    // They let the PPU know:
+    // - which nametable is currently active
+    // - which tile inside that nametable is being used
+    // - and which fine pixel offset inside that tile should be rendered/fetched
+    //
+    // This is what allows scrolling to work correctly without relying only on
+    // visible screen position.
+    //
+    // IMPORTANT:
+    // This is now the single source of truth for the active/rendered address path
+    // and the CPU facing scroll/address write path:
+    // - current_vram_addr ("v")
+    // - temp_vram_addr ("t")
+    // - fine_x_scroll ("x")
+    // - write_toggle ("w")
+    //
+    // Older parallel state like:
+    // - ppu_addr
+    // - full_scroll_x_pixels
+    // - full_scroll_y_pixels
+    // - ppu_addr_toggle
+    // - ppu_scroll_toggle
+    //
+    // should not exist anymore because they create split brain bugs.
+    BackgroundScrollState background_scroll_state{};
 };
 
 using CPURegisterReadHandler = Byte (PPU::*)();

@@ -743,6 +743,8 @@ Byte CPU6502::exec_pha(AddrMode)
     bus_write((0x0100 | regs.sp), regs.a);
     regs.sp--;
     return 0; // no extra cycles here
+
+    
 }
 
 Byte CPU6502::exec_php(AddrMode)

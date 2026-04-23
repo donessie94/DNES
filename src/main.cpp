@@ -11,19 +11,22 @@ int main()
     }
 
     NES nes;
-    if(!nes.cartridge.initialize_from_file("ROMs/donkey_kong.nes")){
+    if(!nes.cartridge.initialize_from_file("ROMs/Ice_Climber.nes")){
         std::cout<<"Error loading ROM"<<'\n';
         return 1;
     }
 
     nes.cpu.reset();
+    nes.ppu.current_dot = -1;
 
     bool running = true;
     while (running) {
 
-        int instructions = 1000;
+        int instructions = 2500;
         while (instructions > 0){   // 1000 instr at a time for now
             int cpu_cycles_taken = nes.cpu.exec_nxt_instr();
+
+            // nes.cpu.log_trace_line(std::cout);
 
             // standard estimate, PPU is 3x faster than CPU
             int ppu_cycles_to_advance = 3 * cpu_cycles_taken;
@@ -51,6 +54,7 @@ int main()
         DebugImage palette_img   = nes.ppu.build_palette_debug_image();
         DebugImage pattern_img   = nes.ppu.build_pattern_table_debug_image();
         DebugImage nametable_img = nes.ppu.build_nametable_debug_image();
+
 
         // Pitch is how many Bytes in a row
         sdl_screen.update_palette_texture(palette_img.pixels, palette_img.width * 4);
