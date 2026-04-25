@@ -190,11 +190,12 @@ void PPU::step_one_cycle()
     // Scanline / frame wrap
     // ============================================================
     if(current_dot >= 341){
-        current_dot = 0;
+        current_dot = -1;
         current_scanline++;
 
         if(current_scanline >= 262){
             current_scanline = 0;
+            frame_ready = true;
         }
 
         // Build the sprite list once for the NEW scanline we are about to render.

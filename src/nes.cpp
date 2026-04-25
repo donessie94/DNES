@@ -9,4 +9,6 @@ NES::NES()
     bus.ppu_ref         = &this->ppu;
     bus.cartridge_ref   = &this->cartridge;
     ppu.cartridge_ref   = &this->cartridge;
+    bus.controller1_ref = &this->controller1;
+    bus.controller2_ref = &this->controller2;
 }

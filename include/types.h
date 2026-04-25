@@ -10,7 +10,6 @@ using FrameBuffer = std::vector<std::uint32_t>;
 using RGB = std::array<std::uint8_t, 3>;
 
 
-
 enum class Mnemonic {
     ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL,
     BRK, BVC, BVS, CLC, CLD, CLI, CLV, CMP, CPX, CPY,
@@ -298,6 +297,68 @@ struct SpritePixelSample
     bool is_opaque{};
     bool behind_background{};
     std::uint32_t sprite_rgba{};
+};
+
+struct PulseChannelState {
+    Byte reg0{};
+    Byte reg1{};
+    Byte reg2{};
+    Byte reg3{};
+    bool enabled{};
+
+    // timer / sequencer
+    Word timer_period{};
+    Word timer_counter{};
+    Byte duty_step{};
+
+    // length counter
+    Byte length_counter{};
+
+    // envelope
+    bool envelope_start_flag{};
+    Byte envelope_divider{};
+    Byte envelope_decay_level{};
+
+    // sweep
+    bool sweep_reload_flag{};
+    Byte sweep_divider{};
+};
+
+struct TriangleChannelState {
+    Byte reg0{};
+    Byte reg1{};
+    Byte reg2{};
+    Byte reg3{};
+    bool enabled{};
+    Word timer_period{};
+    Word timer_counter{};
+    Byte sequence_step{};
+    Byte length_counter{};
+    Byte linear_counter{};
+    bool linear_counter_reload_flag{};
+};
+
+struct NoiseChannelState {
+    Byte reg0{};
+    Byte reg1{};
+    Byte reg2{};
+    Byte reg3{};
+    bool enabled{};
+    Word timer_period{};
+    Word timer_counter{};
+    std::uint16_t shift_register{1};
+    Byte length_counter{};
+    bool envelope_start_flag{};
+    Byte envelope_divider{};
+    Byte envelope_decay_level{};
+};
+
+struct DMCChannelState {
+    Byte reg0{};
+    Byte reg1{};
+    Byte reg2{};
+    Byte reg3{};
+    bool enabled{};
 };
 
 

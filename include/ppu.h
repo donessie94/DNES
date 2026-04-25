@@ -169,6 +169,8 @@ public:
     //
     // should not exist anymore because they create split brain bugs.
     BackgroundScrollState background_scroll_state{};
+
+    bool frame_ready{};
 };
 
 using CPURegisterReadHandler = Byte (PPU::*)();

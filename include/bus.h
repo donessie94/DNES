@@ -5,6 +5,7 @@ class CPURam;
 class APU;
 class PPU;
 class Cartridge;
+class Controller;
 
 class Bus {
 public:
@@ -16,4 +17,6 @@ public:
     APU* apu_ref = nullptr;
     PPU* ppu_ref = nullptr;
     Cartridge* cartridge_ref = nullptr;
+    Controller* controller1_ref = nullptr;
+    Controller* controller2_ref = nullptr;
 };

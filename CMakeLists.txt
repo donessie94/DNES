@@ -25,6 +25,8 @@ add_executable(dnes
     src/nes.cpp
     src/ppu.cpp
     src/SDLScreen.cpp
+    src/controller.cpp
+    src/SDLAudio.cpp
 )
 
 target_include_directories(dnes PRIVATE include)
