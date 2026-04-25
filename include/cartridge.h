@@ -2,6 +2,7 @@
 #include"types.h"
 #include"mapper.h"
 #include<fstream>
+#include <memory>
 
 class Cartridge {
 public:
