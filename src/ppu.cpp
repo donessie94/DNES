@@ -1419,7 +1419,7 @@ DebugImage PPU::build_palette_debug_image()
     // For any pixel (x, y) in a Row Major image buffer:
     // index = y * width + x
     // ===================================================
-    DebugImage image{.height = 64, .width = 128};
+    DebugImage image{.width = 128, .height = 64};
 
     // A flat vector, its data stored as Row0 (left to right), then
     // Row1 (left to right), etc ... (ROW MAJOR so we can use the formula)
