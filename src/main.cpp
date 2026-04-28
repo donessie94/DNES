@@ -15,7 +15,7 @@ int main()
     }
 
     SDLScreen sdl_screen;
-    if(!sdl_screen.initialize(256, 240, 4)){
+    if(!sdl_screen.initialize(256, 240, 4, false)){
         std::cerr << sdl_screen.get_error();
         SDL_Quit();
         return 1;

@@ -7,7 +7,7 @@ public:
     SDLScreen() = default;
     ~SDLScreen() { shutdown(); }
     const char* get_error() const { return last_error_message; }
-    bool initialize(int w = 256, int h = 240, int s = 4);
+    bool initialize(int w, int h, int s, bool debug_panels = true);
     void shutdown();
     void update_screen_texture(const FrameBuffer& frame_buffer, int pitch);
     void update_palette_texture(const FrameBuffer& frame_buffer, int pitch);
@@ -15,6 +15,7 @@ public:
     void update_nametable_texture(const FrameBuffer& frame_buffer, int pitch);
     void present_frame();
 private:
+    bool show_debug_panels{true};
     bool create_texture(SDL_Texture*& texture, int w, int h);
     const char* last_error_message{};
     int width{}; // actual width of screen texture (logical image)
