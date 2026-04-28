@@ -744,7 +744,7 @@ Byte CPU6502::exec_pha(AddrMode)
     regs.sp--;
     return 0; // no extra cycles here
 
-    
+
 }
 
 Byte CPU6502::exec_php(AddrMode)

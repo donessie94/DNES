@@ -299,29 +299,21 @@ struct SpritePixelSample
     std::uint32_t sprite_rgba{};
 };
 
+inline constexpr std::array<std::array<Byte, 8>, 4> PULSE_DUTY_TABLE{{
+    {{0, 1, 0, 0, 0, 0, 0, 0}}, // duty mode 0 = 12.5%
+    {{0, 1, 1, 0, 0, 0, 0, 0}}, // duty mode 1 = 25%
+    {{0, 1, 1, 1, 1, 0, 0, 0}}, // duty mode 2 = 50%
+    {{1, 0, 0, 1, 1, 1, 1, 1}}  // duty mode 3 = negated 25%-ish pattern
+}};
+
 struct PulseChannelState {
     Byte reg0{};
     Byte reg1{};
     Byte reg2{};
     Byte reg3{};
-    bool enabled{};
-
-    // timer / sequencer
-    Word timer_period{};
-    Word timer_counter{};
-    Byte duty_step{};
-
-    // length counter
-    Byte length_counter{};
-
-    // envelope
-    bool envelope_start_flag{};
-    Byte envelope_divider{};
-    Byte envelope_decay_level{};
-
-    // sweep
-    bool sweep_reload_flag{};
-    Byte sweep_divider{};
+    bool enabled{};         // Should this channel currently run at all?
+    Word timer_counter{};   // How many ticks remain before the next waveform step
+    Byte duty_step{};       // Current position in the 8-step duty waveform
 };
 
 struct TriangleChannelState {
