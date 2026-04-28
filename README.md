@@ -4,6 +4,12 @@ DNES is a NES emulator project written in modern C++ with SDL3 for graphics/inpu
 
 The goal of this project is to understand emulator architecture by implementing the major NES subsystems step by step rather than treating the emulator like a black box.
 
+## Screenshots
+<img width="1023" height="989" alt="Screenshot 2026-04-27 at 9 43 29 PM" src="https://github.com/user-attachments/assets/b7e61092-afe5-479b-bd3b-d21f1fcb7f03" />
+<img width="1025" height="991" alt="Screenshot 2026-04-27 at 9 44 29 PM" src="https://github.com/user-attachments/assets/e0ea65cb-ff3e-4002-a236-ae0ff183ae4f" />
+<img width="1023" height="986" alt="Screenshot 2026-04-27 at 9 42 28 PM" src="https://github.com/user-attachments/assets/c083794b-6a1f-4382-bc8f-d4dc0c565e4d" />
+
+
 ## Current state
 
 The project currently has working or partially working support for:
